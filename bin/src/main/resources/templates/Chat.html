@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Talksy — Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+  <!-- Libraries required for your backend -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+  <style>
+    :root {
+      /* Core Colors */
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-light: #e0e7ff;
+      --primary-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+      
+      /* Status */
+      --status-online: #22c55e;
+      --status-offline: #ef4444;
+      --status-connecting: #eab308;
+
+      /* Light Theme Defaults */
+      --bg-body: #f3f4f6;
+      --bg-surface: #ffffff;
+      --bg-sidebar: #f9fafb;
+      --bg-input: #ffffff;
+      --bg-input-dim: #f3f4f6;
+      --bg-input-wrapper: #f9fafb;
+      --bg-header: rgba(255,255,255,0.9);
+      --bg-hover: rgba(0,0,0,0.04);
+      --bg-scrollbar: #e5e7eb;
+      
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --text-inverse: #ffffff;
+      
+      --border: #e5e7eb;
+      
+      --bubble-me: #6366f1;
+      --bubble-other: #f3f4f6;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="dark"] {
+      --bg-body: #111827;
+      --bg-surface: #1f2937;
+      --bg-sidebar: #111827;
+      --bg-input: #374151;
+      --bg-input-dim: #374151;
+      --bg-input-wrapper: #374151;
+      --bg-header: rgba(31, 41, 55, 0.9);
+      --bg-hover: rgba(255,255,255,0.05);
+      --bg-scrollbar: #374151;
+      
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      
+      --border: #374151;
+      
+      --bubble-other: #374151;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      
+      --primary-light: rgba(99, 102, 241, 0.2);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-body);
+      margin: 0;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      color: var(--text-main);
+      transition: background 0.3s;
+    }
+
+    /* --- Layout --- */
+    .app-container {
+      width: 100%;
+      height: 100%;
+      max-width: 1400px;
+      background: var(--bg-surface);
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+
+    @media (min-width: 768px) {
+      .app-container {
+        height: 90vh;
+        width: 95vw;
+        border-radius: 20px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border);
+      }
+    }
+
+    /* --- Sidebar (Left) --- */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, border-color 0.3s;
+      z-index: 30;
+      height: 100%;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-surface);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .sidebar-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .theme-toggle:hover {
+      background: var(--bg-hover);
+      color: var(--text-main);
+    }
+
+    .user-config label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .styled-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s;
+      background: var(--bg-input);
+      color: var(--text-main);
+    }
+    .styled-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    /* Search Bar */
+    .search-box {
+      margin-top: 12px;
+      position: relative;
+    }
+    .search-box i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .search-box input {
+      padding-left: 32px;
+      font-size: 0.9rem;
+      background: var(--bg-input-dim);
+      border: 1px solid transparent;
+      color: var(--text-main);
+    }
+    .search-box input:focus {
+      background: var(--bg-input);
+      border: 1px solid var(--primary);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      scrollbar-color: var(--bg-scrollbar) transparent;
+      scrollbar-width: thin;
+    }
+    .sidebar-content::-webkit-scrollbar { width: 6px; }
+    .sidebar-content::-webkit-scrollbar-thumb { background-color: var(--bg-scrollbar); border-radius: 4px; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 16px 0 8px 0;
+      display: block;
+      text-transform: uppercase;
+      padding-left: 4px;
+    }
+
+    /* Nav Items (Global Chat & Users) */
+    .nav-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-main);
+      position: relative;
+      border: 1px solid transparent;
+    }
+    .nav-item:hover { background: var(--bg-hover); }
+    .nav-item.active { 
+      background: var(--bg-surface);
+      border-color: var(--border);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .nav-item.active .name { color: var(--primary); font-weight: 600; }
+
+    .nav-item .icon-box {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+      font-size: 1.1rem;
+    }
+
+    .nav-item img {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 12px;
+      background: var(--bg-input);
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+    
+    .nav-item .name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.95rem;
+    }
+
+    /* Online Status Animation */
+    @keyframes pulse-green {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .status-indicator {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 10px;
+      height: 10px;
+      background: var(--status-online);
+      border: 2px solid var(--bg-surface);
+      border-radius: 50%;
+      animation: pulse-green 2s infinite;
+    }
+    
+    .avatar-wrapper {
+      position: relative;
+      width: 36px; height: 36px;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .avatar-wrapper img { margin: 0; width: 100%; height: 100%; border-radius: 50%; }
+
+    #userList { list-style: none; padding: 0; margin: 0; }
+
+    /* --- Chat Area (Right) --- */
+    .chat-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: var(--bg-surface);
+      min-width: 0;
+      transition: background 0.3s;
+    }
+
+    .chat-header {
+      height: 70px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-header);
+      backdrop-filter: blur(8px);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .chat-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .chat-title-group h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-main);
+      padding: 4px;
+      margin-left: -8px;
+    }
+
+    /* Connection Status */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg-input-dim);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-offline); transition: background 0.3s; }
+    .status-dot.connected { background: var(--status-online); }
+    .status-dot.connecting { background: var(--status-connecting); }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: var(--bg-surface);
+      scroll-behavior: smooth;
+      scrollbar-color: var(--bg-scrollbar) transparent;
+      scrollbar-width: thin;
+    }
+    #chat::-webkit-scrollbar { width: 6px; }
+    #chat::-webkit-scrollbar-thumb { background-color: var(--bg-scrollbar); border-radius: 4px; }
+
+    /* Messages */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 70%;
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+    .bubble {
+      padding: 12px 18px;
+      border-radius: 18px;
+      position: relative;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      word-wrap: break-word;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .message .bubble.me {
+      background: var(--primary-grad);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    .message .bubble.me a { color: #fff; text-decoration: underline; }
+
+    .message .bubble.others {
+      background: var(--bubble-other);
+      color: var(--text-main);
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+      margin-right: auto;
+    }
+    .message .bubble.others a { color: var(--primary); }
+
+    .meta {
+      font-size: 0.7rem;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+    .bubble.me .meta { color: rgba(255,255,255,0.9); text-align: right; }
+    .bubble.others .meta { color: var(--text-muted); }
+
+    .file-preview {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: block;
+      object-fit: cover;
+      background: var(--bg-input-dim);
+    }
+
+    /* Typing Indicator */
+    .typing-container {
+      display: none; /* hidden by default */
+      align-items: center;
+      gap: 4px;
+      margin-left: 10px;
+      margin-bottom: 10px;
+      animation: fadeIn 0.3s;
+    }
+    .typing-container.active { display: flex; }
+    
+    .typing-bubble {
+      background: var(--bubble-other);
+      padding: 12px 16px;
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: fit-content;
+      transition: background 0.3s;
+    }
+    
+    .typing-dot {
+      width: 6px; height: 6px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+    
+    .typing-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 6px;
+    }
+
+    /* --- Input Area --- */
+    .input-area {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-input-wrapper);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 6px 6px 6px 16px;
+      transition: all 0.2s;
+    }
+    .input-wrapper:focus-within {
+      border-color: var(--primary);
+      background: var(--bg-surface);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    #messageInput {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px 0;
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      color: var(--text-main);
+    }
+
+    .action-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      transition: color 0.2s, background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .action-btn:hover { color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+
+    .send-btn {
+      background: var(--primary-grad);
+      color: white;
+      border: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      box-shadow: 0 2px 5px rgba(99, 102, 241, 0.3);
+    }
+    .send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(99, 102, 241, 0.4); }
+    .send-btn:active { transform: scale(0.95); }
+
+    /* Upload Preview & Emoji */
+    .preview-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 0 10px;
+    }
+    #filePreview {
+      max-height: 60px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: none; 
+    }
+
+    .emoji-popover {
+      position: absolute;
+      bottom: 90px;
+      right: 24px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      width: 320px;
+      padding: 16px;
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      z-index: 50;
+      max-height: 280px;
+      overflow-y: auto;
+      scrollbar-color: var(--bg-scrollbar) transparent;
+      scrollbar-width: thin;
+    }
+    .emoji-popover.open { display: flex; animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes popIn { from { opacity:0; transform: scale(0.9); } to { opacity:1; transform: scale(1); } }
+    
+    .emoji { cursor: pointer; padding: 8px; font-size: 1.4rem; border-radius: 8px; transition: transform 0.1s; }
+    .emoji:hover { background: var(--bg-input-dim); transform: scale(1.15); }
+
+    /* Mobile Overlay */
+    .overlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.5); z-index: 20;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      .app-container { border-radius: 0; }
+      
+      .sidebar {
+        position: absolute;
+        top: 0; left: 0; height: 100%;
+        width: 85%;
+        max-width: 320px;
+        transform: translateX(-100%);
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      }
+      .sidebar.active { transform: translateX(0); }
+      .overlay.active { display: block; }
+      
+      .mobile-menu-btn { display: block; }
+      .status-badge .status-text { display: none; }
+      .chat-header { padding: 0 16px; }
+      #chat { padding: 16px; }
+      .message { max-width: 85%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  
+  <!-- Mobile Backdrop -->
+  <div class="overlay" id="mobileOverlay"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-top">
+        <div class="brand">
+          <i class="bi bi-chat-square-dots-fill" style="color:var(--primary)"></i> Talksy
+        </div>
+        <button id="themeToggle" class="theme-toggle" title="Switch Theme">
+          <i class="bi bi-moon-fill"></i>
+        </button>
+      </div>
+      
+      <div class="user-config">
+        <label>Your Name</label>
+        <input id="senderInput" class="styled-input" placeholder="Enter name..." autocomplete="off" />
+      </div>
+      
+      <div class="search-box">
+        <i class="bi bi-search"></i>
+        <input id="searchInput" class="styled-input" placeholder="Search people..." />
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <div class="section-label">Channels</div>
+      <div class="nav-item active" id="globalChatBtn" onclick="switchChat(null)">
+        <div class="icon-box"><i class="bi bi-globe"></i></div>
+        <div class="name">Global Chat</div>
+      </div>
+
+      <div class="section-label">People Online</div>
+      <div id="userListContainer">
+        <ul id="userList">
+          <!-- User items will be injected here -->
+        </ul>
+        <div id="noUsersMsg" style="display:none; padding:12px; color:var(--text-muted); font-size:0.85rem; text-align:center;">
+          No matching users found.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="chat-pane">
+    <header class="chat-header">
+      <div class="chat-title-group">
+        <button class="mobile-menu-btn" id="menuBtn">
+          <i class="bi bi-list"></i>
+        </button>
+        <div class="avatar-wrapper" id="headerAvatar" style="display:none">
+          <img src="https://ui-avatars.com/api/?background=random&name=?" alt="" id="headerAvatarImg">
+          <div class="status-indicator"></div>
+        </div>
+        <div>
+          <h3 id="chatTitle">Global Chat</h3>
+          <span id="chatSubtitle" style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">Public channel</span>
+        </div>
+      </div>
+      
+      <div class="status-badge">
+        <div class="status-dot" id="connDot"></div>
+        <span class="status-text" id="connText">Offline</span>
+      </div>
+    </header>
+
+    <div id="chat">
+      <!-- Messages injected here -->
+    </div>
+
+    <!-- Typing Indicator (Absolute position above input) -->
+    <div class="typing-container" id="typingIndicator">
+      <div class="typing-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+      <span class="typing-text" id="typingText">Someone is typing...</span>
+    </div>
+
+    <div class="input-area">
+      <div class="preview-bar">
+        <div id="attachedFileName" style="font-size:0.8rem; color:var(--text-muted);"></div>
+        <img id="filePreview" />
+      </div>
+      
+      <div class="input-wrapper">
+        <input type="file" id="fileInput" style="display:none" />
+        <button class="action-btn" id="attachBtn" title="Attach File">
+          <i class="bi bi-paperclip"></i>
+        </button>
+        <button class="action-btn" id="emojiBtn" title="Emoji">
+          <i class="bi bi-emoji-smile"></i>
+        </button>
+        
+        <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
+        
+        <button id="sendMessage" class="send-btn">
+          <i class="bi bi-send-fill"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Emoji Popover -->
+    <div id="emojiPopover" class="emoji-popover">
+      <div class="emoji">😀</div><div class="emoji">😁</div><div class="emoji">😂</div><div class="emoji">🤣</div>
+      <div class="emoji">😊</div><div class="emoji">😍</div><div class="emoji">😎</div><div class="emoji">🤩</div>
+      <div class="emoji">😋</div><div class="emoji">🤔</div><div class="emoji">🤨</div><div class="emoji">😐</div>
+      <div class="emoji">😑</div><div class="emoji">😶</div><div class="emoji">🙄</div><div class="emoji">😏</div>
+      <div class="emoji">😣</div><div class="emoji">😥</div><div class="emoji">😮</div><div class="emoji">😯</div>
+      <div class="emoji">😪</div><div class="emoji">😫</div><div class="emoji">😴</div><div class="emoji">😌</div>
+      <div class="emoji">😛</div><div class="emoji">😜</div><div class="emoji">😝</div><div class="emoji">🤤</div>
+      <div class="emoji">😒</div><div class="emoji">😓</div><div class="emoji">😔</div><div class="emoji">😕</div>
+      <div class="emoji">👍</div><div class="emoji">👎</div><div class="emoji">👌</div><div class="emoji">✌️</div>
+      <div class="emoji">🤞</div><div class="emoji">🤟</div><div class="emoji">🤘</div><div class="emoji">🙏</div>
+      <div class="emoji">👏</div><div class="emoji">🙌</div><div class="emoji">👐</div><div class="emoji">🤲</div>
+      <div class="emoji">🤝</div><div class="emoji">🔥</div><div class="emoji">❤️</div><div class="emoji">💔</div>
+      <div class="emoji">✨</div><div class="emoji">🎉</div><div class="emoji">🚀</div><div class="emoji">💯</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  /** 
+   * CONFIGURATION 
+   * Update this to your actual backend URL if different.
+   * If serving from the same origin, relative path is fine.
+   */
+  const SERVER_URL = '/ws-chat'; 
+  const RECONNECT_DELAY = 5000;
+
+  // --- STATE ---
+  let stompClient = null;
+  let selectedUser = null; // null = Global Chat
+  let currentUser = '';
+  let allMessages = []; // Local history store
+  let onlineUsers = [];
+  let typingTimeouts = {}; // Map username -> timeout ID
+  let isTyping = false;
+  let typingTimeoutRef = null;
+
+  // --- DOM ELEMENTS ---
+  const chatContainer = document.getElementById('chat');
+  const messageInput = document.getElementById('messageInput');
+  const senderInput = document.getElementById('senderInput');
+  const userListEl = document.getElementById('userList');
+  const connDot = document.getElementById('connDot');
+  const connText = document.getElementById('connText');
+  const searchInput = document.getElementById('searchInput');
+  const typingIndicator = document.getElementById('typingIndicator');
+  const typingText = document.getElementById('typingText');
+  const themeToggleBtn = document.getElementById('themeToggle');
+
+  // --- INITIALIZATION ---
+  window.onload = function() {
+    // Restore name if saved
+    const savedName = localStorage.getItem('talksy_username');
+    if (savedName) {
+      senderInput.value = savedName;
+      currentUser = savedName;
+    }
+    
+    // Restore Theme
+    const savedTheme = localStorage.getItem('talksy_theme') || 'light';
+    applyTheme(savedTheme);
+
+    connect();
+  };
+  
+  // --- THEME LOGIC ---
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = themeToggleBtn.querySelector('i');
+    if (theme === 'dark') {
+      icon.className = 'bi bi-sun-fill';
+    } else {
+      icon.className = 'bi bi-moon-fill';
+    }
+  }
+
+  themeToggleBtn.onclick = () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('talksy_theme', next);
+  };
+
+  // --- CONNECTION LOGIC ---
+  function connect() {
+    updateConnectionStatus('connecting');
+    
+    const socket = new SockJS(SERVER_URL);
+    stompClient = Stomp.over(socket);
+    
+    // Disable debug logs for cleaner console
+    stompClient.debug = () => {};
+
+    stompClient.connect({}, function(frame) {
+      updateConnectionStatus('online');
+      
+      // Subscribe to Public Topic
+      stompClient.subscribe('/topic/messages', function(msg) {
+        try {
+          const body = JSON.parse(msg.body);
+          handleIncomingMessage(body);
+        } catch(e) { console.error(e); }
+      });
+
+      // Subscribe to User Updates
+      stompClient.subscribe('/topic/users', function(msg) {
+        try {
+          const users = JSON.parse(msg.body);
+          updateUserList(users);
+        } catch(e) { console.error(e); }
+      });
+
+      // Announce Presence
+      announceJoin();
+
+    }, function(err) {
+      console.error('STOMP error', err);
+      updateConnectionStatus('offline');
+      setTimeout(connect, RECONNECT_DELAY);
+    });
+  }
+
+  function updateConnectionStatus(status) {
+    connDot.className = 'status-dot ' + status;
+    if (status === 'online') {
+      connText.textContent = 'Online';
+      connText.style.color = 'var(--text-muted)';
+    } else if (status === 'connecting') {
+      connText.textContent = 'Connecting...';
+    } else {
+      connText.textContent = 'Disconnected';
+      connText.style.color = 'var(--status-offline)';
+    }
+  }
+
+  function announceJoin() {
+    currentUser = (senderInput.value || '').trim();
+    if (currentUser && stompClient && stompClient.connected) {
+      localStorage.setItem('talksy_username', currentUser);
+      try {
+        stompClient.send('/app/join', {}, JSON.stringify({ sender: currentUser }));
+      } catch (e) { console.error(e); }
+    }
+  }
+
+  // --- MESSAGING LOGIC ---
+  function handleIncomingMessage(msg) {
+    // Check for special types first
+    if (msg.type === 'TYPING') {
+      handleTypingEvent(msg.sender);
+      return;
+    }
+
+    // Store message in history
+    allMessages.push(msg);
+    
+    // If the message belongs to current view, render it
+    // Logic: 
+    // 1. Global View (selectedUser=null): Show messages with no 'to' field OR 'to' is null.
+    // 2. Private View (selectedUser='Bob'): Show messages where (sender='Bob' AND to='Me') OR (sender='Me' AND to='Bob').
+    
+    const isPrivate = msg.to ? true : false;
+    
+    // Global Chat Logic
+    if (selectedUser === null) {
+      if (!isPrivate) {
+        renderMessage(msg);
+        scrollToBottom();
+      }
+    } 
+    // Private Chat Logic
+    else {
+      // Is this message relevant to the currently open private chat?
+      const relevant = (msg.sender === selectedUser && msg.to === currentUser) || 
+                       (msg.sender === currentUser && msg.to === selectedUser);
+      if (relevant) {
+        renderMessage(msg);
+        scrollToBottom();
+      }
+    }
+
+    // Show notification/indicator if message is from someone else not currently selected
+    if (isPrivate && msg.sender !== currentUser && msg.sender !== selectedUser) {
+      showUnreadIndicator(msg.sender);
+    }
+  }
+
+  function sendMessage() {
+    if (!stompClient || !stompClient.connected) return;
+    
+    currentUser = (senderInput.value || '').trim();
+    if (!currentUser) {
+      alert('Please enter your name first');
+      senderInput.focus();
+      return;
+    }
+
+    const content = messageInput.value.trim();
+    if (!content) return;
+
+    // Construct Payload
+    const msg = { 
+      sender: currentUser, 
+      content: content, 
+      type: 'TEXT', 
+      timestamp: new Date().toISOString()
+    };
+
+    // If in private chat, add 'to' field
+    if (selectedUser) {
+      msg.to = selectedUser;
+    }
+
+    try {
+      stompClient.send('/app/sendMessage', {}, JSON.stringify(msg));
+      messageInput.value = '';
+      stopTyping(); // Clear typing status immediately
+    } catch (e) { console.error('Send failed', e); }
+  }
+
+  function stopTyping() {
+      // Logic to clear local typing state if we wanted to broadcast 'STOP_TYPING',
+      // but for now we just let the timeout on other clients handle it.
+      isTyping = false;
+      clearTimeout(typingTimeoutRef);
+  }
+
+  function renderMessage(msg) {
+    const isMe = (msg.sender === currentUser);
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message';
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (isMe ? 'me' : 'others');
+
+    // Content Rendering
+    if (msg.type === 'FILE') {
+      const lower = (msg.fileUrl || '').toLowerCase();
+      if (/\.(png|jpg|jpeg|gif|webp)$/.test(lower)) {
+        const img = document.createElement('img');
+        img.src = msg.fileUrl;
+        img.className = 'file-preview';
+        bubble.appendChild(img);
+        if(msg.content) {
+            const txt = document.createElement('div');
+            txt.textContent = msg.content;
+            bubble.appendChild(txt);
+        }
+      } else {
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-file-earmark-arrow-down-fill';
+        const link = document.createElement('a');
+        link.href = msg.fileUrl;
+        link.target = '_blank';
+        link.style.marginLeft = '6px';
+        link.textContent = msg.content || 'Download File';
+        bubble.appendChild(icon);
+        bubble.appendChild(link);
+      }
+    } else {
+      bubble.textContent = msg.content;
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    meta.textContent = isMe ? time : (msg.sender + ' • ' + time);
+    
+    bubble.appendChild(meta);
+    wrapper.appendChild(bubble);
+    chatContainer.appendChild(wrapper);
+  }
+
+  function scrollToBottom() {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  function switchChat(user) {
+    selectedUser = user;
+    
+    // Update Sidebar UI
+    const globalBtn = document.getElementById('globalChatBtn');
+    const userItems = document.querySelectorAll('.user-item-wrapper');
+    
+    if (user === null) {
+      globalBtn.classList.add('active');
+      userItems.forEach(el => el.classList.remove('active'));
+      document.getElementById('chatTitle').textContent = 'Global Chat';
+      document.getElementById('chatSubtitle').textContent = 'Public channel';
+      document.getElementById('headerAvatar').style.display = 'none';
+    } else {
+      globalBtn.classList.remove('active');
+      userItems.forEach(el => {
+        if(el.dataset.username === user) el.classList.add('active');
+        else el.classList.remove('active');
+      });
+      // Clear unread
+      const badge = document.getElementById('badge-' + user);
+      if(badge) badge.style.display = 'none';
+
+      document.getElementById('chatTitle').textContent = user;
+      document.getElementById('chatSubtitle').textContent = 'Private Message';
+      document.getElementById('headerAvatar').style.display = 'block';
+      document.getElementById('headerAvatarImg').src = `https://ui-avatars.com/api/?background=random&name=${user}`;
+    }
+
+    // Mobile: Close drawer
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    if(window.innerWidth < 768) {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    }
+
+    // Repopulate Chat
+    chatContainer.innerHTML = '';
+    
+    // Filter History
+    allMessages.forEach(msg => {
+        const isPrivate = msg.to ? true : false;
+        
+        if (selectedUser === null) {
+            // Show global messages only
+            if (!isPrivate) renderMessage(msg);
+        } else {
+            // Show private messages between me and selectedUser
+            const relevant = (msg.sender === selectedUser && msg.to === currentUser) || 
+                             (msg.sender === currentUser && msg.to === selectedUser);
+            if (relevant) renderMessage(msg);
+        }
+    });
+    
+    scrollToBottom();
+    messageInput.focus();
+  }
+
+  // --- TYPING INDICATOR LOGIC ---
+  messageInput.addEventListener('input', () => {
+    if (!isTyping) {
+      isTyping = true;
+      sendTypingStatus();
+    }
+    clearTimeout(typingTimeoutRef);
+    typingTimeoutRef = setTimeout(() => {
+      isTyping = false;
+    }, 2000);
+  });
+
+  function sendTypingStatus() {
+    if(!currentUser || !stompClient) return;
+    // Send a message with type TYPING
+    const msg = { sender: currentUser, type: 'TYPING', content: '' };
+    if(selectedUser) msg.to = selectedUser;
+    try {
+        stompClient.send('/app/sendMessage', {}, JSON.stringify(msg));
+    } catch(e){}
+  }
+
+  function handleTypingEvent(sender) {
+    if (sender === currentUser) return; // Ignore own typing
+
+    // Only show if we are in the context of the sender
+    if (selectedUser) {
+        // In PM: Only show if the typing comes from the selected user
+        if (sender !== selectedUser) return;
+    }
+
+    // UI Logic
+    typingText.textContent = `${sender} is typing...`;
+    typingIndicator.classList.add('active');
+    
+    // Clear existing timeout for this user
+    if (typingTimeouts[sender]) clearTimeout(typingTimeouts[sender]);
+    
+    // Set removal timeout
+    typingTimeouts[sender] = setTimeout(() => {
+      typingIndicator.classList.remove('active');
+    }, 3000);
+  }
+
+  // --- USER LIST LOGIC ---
+  function updateUserList(users) {
+    onlineUsers = users;
+    renderUserListDOM();
+  }
+
+  function renderUserListDOM() {
+    userListEl.innerHTML = '';
+    const filter = searchInput.value.toLowerCase();
+    
+    const others = onlineUsers.filter(u => u !== currentUser);
+    const visibleUsers = others.filter(u => u.toLowerCase().includes(filter));
+
+    if (visibleUsers.length === 0) {
+      document.getElementById('noUsersMsg').style.display = 'block';
+    } else {
+      document.getElementById('noUsersMsg').style.display = 'none';
+      visibleUsers.forEach(u => {
+        const li = document.createElement('li');
+        li.className = 'nav-item user-item-wrapper';
+        li.dataset.username = u;
+        if(selectedUser === u) li.classList.add('active');
+        
+        li.onclick = () => switchChat(u);
+
+        li.innerHTML = `
+          <div class="avatar-wrapper">
+            <img src="https://ui-avatars.com/api/?background=random&name=${u}" alt="${u}">
+            <div class="status-indicator"></div>
+          </div>
+          <div class="name">${u}</div>
+          <div id="badge-${u}" style="display:none; width:8px; height:8px; background:var(--primary); border-radius:50%;"></div>
+        `;
+        userListEl.appendChild(li);
+      });
+    }
+  }
+
+  function showUnreadIndicator(sender) {
+    const badge = document.getElementById('badge-' + sender);
+    if(badge) badge.style.display = 'block';
+  }
+
+  searchInput.addEventListener('input', renderUserListDOM);
+
+  // --- NAME CHANGE HANDLING ---
+  senderInput.addEventListener('blur', announceJoin);
+  senderInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') { 
+      e.preventDefault(); 
+      announceJoin(); 
+    }
+  });
+
+  // --- SEND BUTTONS ---
+  document.getElementById('sendMessage').onclick = sendMessage;
+  messageInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+  });
+
+  // --- FILE UPLOAD ---
+  const fileInput = document.getElementById('fileInput');
+  const attachBtn = document.getElementById('attachBtn');
+  const attachedFileName = document.getElementById('attachedFileName');
+  const filePreview = document.getElementById('filePreview');
+  let attachedFile = null;
+
+  attachBtn.onclick = () => fileInput.click();
+  
+  fileInput.onchange = (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    attachedFile = f;
+    attachedFileName.textContent = f.name;
+    
+    if(f.type.startsWith('image/')) {
+        filePreview.src = URL.createObjectURL(f);
+        filePreview.style.display = 'block';
+    } else {
+        filePreview.style.display = 'none';
+    }
+    uploadFile();
+  };
+
+function uploadFile() {
+  if (!attachedFile || !stompClient) return;
+
+  // Ensure currentUser is set
+  currentUser = (senderInput.value || '').trim();
+  if (!currentUser) {
+    alert('Please enter your name first');
+    senderInput.focus();
+    return;
+  }
+
+  // Visual feedback
+  attachedFileName.textContent = 'Uploading ' + attachedFile.name + '...';
+
+  const formData = new FormData();
+  formData.append('file', attachedFile);
+  formData.append('sender', currentUser);
+
+  // ✅ If in private chat, tell backend who the recipient is
+  if (selectedUser) {
+    formData.append('to', selectedUser);
+  }
+
+  fetch('/upload', { method: 'POST', body: formData })
+    .then(res => {
+      if (!res.ok) throw new Error('Error');
+      return res.json();
+    })
+    .then(data => {
+      attachedFile = null;
+      attachedFileName.textContent = '';
+      filePreview.style.display = 'none';
+      // No need to manually render: WebSocket broadcast will call handleIncomingMessage()
+    })
+    .catch(err => {
+      console.error(err);
+      attachedFileName.textContent = 'Upload Failed';
+    });
+}
+
+
+  // --- EMOJI ---
+  const emojiBtn = document.getElementById('emojiBtn');
+  const emojiPopover = document.getElementById('emojiPopover');
+  
+  emojiBtn.onclick = (e) => {
+    e.stopPropagation();
+    emojiPopover.classList.toggle('open');
+  };
+
+  document.querySelectorAll('.emoji').forEach(e => {
+    e.onclick = () => {
+      messageInput.value += e.textContent;
+      messageInput.focus();
+    };
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!emojiPopover.contains(e.target) && !emojiBtn.contains(e.target)) {
+      emojiPopover.classList.remove('open');
+    }
+  });
+
+  // --- MOBILE DRAWER ---
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('mobileOverlay');
+
+  menuBtn.onclick = () => {
+    sidebar.classList.add('active');
+    overlay.classList.add('active');
+  };
+  
+  overlay.onclick = () => {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+  };
+
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+

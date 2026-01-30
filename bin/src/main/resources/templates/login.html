@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --input-bg: #f9f9f9;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            overflow: hidden;
+            position: relative;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Animated Particles */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            bottom: -100px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            animation: float 20s infinite linear;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Login Card */
+        .login-card {
+            position: relative;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 50px 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            width: 400px;
+            max-width: 90%;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            animation: slideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform: translateY(0);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .login-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        p.subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* Messages */
+        .message-error,
+        .message-success {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        .message-error {
+            color: #fff;
+            background: rgba(255, 0, 0, 0.8);
+        }
+
+        .message-success {
+            color: #fff;
+            background: rgba(0, 150, 0, 0.85);
+        }
+
+        /* Inputs */
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 16px 20px 16px 50px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            background: var(--input-bg);
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+            color: #333;
+        }
+
+        .input-group input:focus {
+            background: #fff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: #aaa;
+            transition: color 0.3s ease;
+        }
+
+        .input-group input:focus + .input-icon {
+            color: #667eea;
+        }
+
+        /* Button */
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: var(--primary-gradient);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(118, 75, 162, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Footer Links */
+        .footer {
+            margin-top: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .footer a {
+            text-decoration: none;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .footer a:hover {
+            color: #667eea;
+        }
+
+        .footer a.register {
+            color: #764ba2;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 40px 25px;
+            }
+            h2 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Floating Particles -->
+    <div class="particles">
+        <div class="particle" style="left: 10%; width: 20px; height: 20px; animation-duration: 12s; animation-delay: 0s;"></div>
+        <div class="particle" style="left: 30%; width: 50px; height: 50px; animation-duration: 15s; animation-delay: 2s;"></div>
+        <div class="particle" style="left: 70%; width: 30px; height: 30px; animation-duration: 10s; animation-delay: 4s;"></div>
+        <div class="particle" style="left: 50%; width: 60px; height: 60px; animation-duration: 18s; animation-delay: 1s;"></div>
+        <div class="particle" style="left: 90%; width: 40px; height: 40px; animation-duration: 20s; animation-delay: 3s;"></div>
+        <div class="particle" style="left: 20%; width: 25px; height: 25px; animation-duration: 25s; animation-delay: 5s;"></div>
+    </div>
+
+    <div class="login-card">
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Enter your credentials to access your account</p>
+
+        <!-- Login error from Spring Security: /auth/login?error -->
+        <div th:if="${param.error}" class="message-error">
+            Invalid email or password
+        </div>
+
+        <!-- Logout success: /auth/login?logout -->
+        <div th:if="${param.logout}" class="message-success">
+            You have been logged out successfully
+        </div>
+
+        <!-- IMPORTANT: same action and field names as your working form -->
+        <form method="post" th:action="@{/login}">
+            <div class="input-group">
+                <!-- EMAIL used as username -->
+                <input type="email" name="username" placeholder="Email Address" required />
+                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                </svg>
+            </div>
+
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Password" required />
+                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+
+            <button type="submit">Login</button>
+
+            <div class="footer">
+                <a th:href="@{/auth/forgot-password}">Forgot Password?</a>
+                <a th:href="@{/auth/register}" class="register">Create Account</a>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>
