@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy all project files
 COPY . .
 
-# Build jar
+# Build jarmvn clean package
 RUN mvn clean package -DskipTests
 
 # Stage 2: Run
